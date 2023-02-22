@@ -1,4 +1,4 @@
-# binutils-gas-pair-macroses-extension
+# binutils-gas-pair-macroses
 
 * What is it?
 
