@@ -1,12 +1,14 @@
 # binutils-gas-pair-macroses-extension
 
 * What is it?
-- This is patches for gnu macro assembler from binutils package.
+
+This is patches for gnu macro assembler from binutils package.
 The current release without patches can be downloaded from
 https://ftp.gnu.org/gnu/binutils.
 
 * Why GNU assembler?
-- Because GNU assembler supports lots of wide spread modern
+
+Because GNU assembler supports lots of wide spread modern
 architectures. See
 https://en.wikipedia.org/wiki/Comparison_of_assemblers
 
@@ -113,21 +115,21 @@ This code prints to stdout the following triangle:
 
 Gas does not allow such deep nested construction without patching:
 
-  18  DO <---------------------\
-          [...]                |
-  32      DO <-------------\   |
-              [...]        |   |
-  34          DO_WHILE ----|   |
-              [...]        |   |
-  40      DONE <-----------/   |
-          [...]                |
-  44      DO <-------------\   |
-              [...]        |   |
-  46          DO_WHILE ----|   |
-              [...]        |   |
-  53      DONE <-----------/   |
-          [...]                |
-  61  DONE_WHEN <--------------/
+      18  DO <---------------------\
+              [...]                |
+      32      DO <-------------\   |
+                  [...]        |   |
+      34          DO_WHILE ----|   |
+                  [...]        |   |
+      40      DONE <-----------/   |
+              [...]                |
+      44      DO <-------------\   |
+                  [...]        |   |
+      46          DO_WHILE ----|   |
+                  [...]        |   |
+      53      DONE <-----------/   |
+              [...]                |
+      61  DONE_WHEN <--------------/
 
 Above is shown the couple of pair (open/close) connected with one another
 macroses (DO ... DONE) which are nested into another pair (open/close)
@@ -140,41 +142,42 @@ features looks weak to be happy with it.
 
 The corresponded listing can be the following:
 
-  18              	                DO
-  18              	>  LABEL_DO_1x0_start:
+      18              	                DO
+      18              	>  LABEL_DO_1x0_start:
+    
+      32              	                    DO
+      32              	>  LABEL_DO_2x0_start:
+    
+      34              	                        DO_WHILE g
+      34 0020 7F02     	>  jg LABEL_DO_WHILE2continue
+      34 0022 EB27     	>  jmp LABEL_DONE_2x0_end
+      34              	>  LABEL_DO_WHILE2continue:
+    
+      40              	                    DONE
+      40 0049 EBCD     	>  jmp LABEL_DO_2x0_start
+      40              	>  LABEL_DONE_2x0_end:
+    
+      44              	                    DO
+      44              	>  LABEL_DO_2x1_start:
+    
+      46              	                        DO_WHILE g
+      46 0061 7F02     	>  jg LABEL_DO_WHILE6continue
+      46 0063 EB27     	>  jmp LABEL_DONE_2x1_end
+      46              	>  LABEL_DO_WHILE6continue:
 
-  32              	                    DO
-  32              	>  LABEL_DO_2x0_start:
-
-  34              	                        DO_WHILE g
-  34 0020 7F02     	>  jg LABEL_DO_WHILE2continue
-  34 0022 EB27     	>  jmp LABEL_DONE_2x0_end
-  34              	>  LABEL_DO_WHILE2continue:
-
-  40              	                    DONE
-  40 0049 EBCD     	>  jmp LABEL_DO_2x0_start
-  40              	>  LABEL_DONE_2x0_end:
-
-  44              	                    DO
-  44              	>  LABEL_DO_2x1_start:
-
-  46              	                        DO_WHILE g
-  46 0061 7F02     	>  jg LABEL_DO_WHILE6continue
-  46 0063 EB27     	>  jmp LABEL_DONE_2x1_end
-  46              	>  LABEL_DO_WHILE6continue:
-
-  52              	                    DONE
-  52 008a EBCD     	>  jmp LABEL_DO_2x1_start
-  52              	>  LABEL_DONE_2x1_end:
-
-  61              	                DONE_WHEN le
-  61 00b8 7E05     	>  jle LABEL_DONE_1x0_end
-  61 00ba E944FFFF 	>  jmp LABEL_DO_1x0_start
-  61      FF
-  61              	>  LABEL_DONE_1x0_end:
+      52              	                    DONE
+      52 008a EBCD     	>  jmp LABEL_DO_2x1_start
+      52              	>  LABEL_DONE_2x1_end:
+    
+      61              	                DONE_WHEN le
+      61 00b8 7E05     	>  jle LABEL_DONE_1x0_end
+      61 00ba E944FFFF 	>  jmp LABEL_DO_1x0_start
+      61      FF
+      61              	>  LABEL_DONE_1x0_end:
 
 * How to apply patches?
-- Select directory for the downloaded binutils version,
+
+Select directory for the downloaded binutils version,
 copy patch files
     macro.h.diff
     macro.c.diff
@@ -192,7 +195,8 @@ When all is correct it is possible to translate your .s programs
 by using as from ../binutils-usr/bin/as utility.
 
 * What advantages does it provide?
-- The possible answers:
+
+The possible answers:
 
 1. This makes it possible to significantly reduce the number of labels.
 Each label is first and foremost a name that should be catchy. Coming
@@ -207,7 +211,8 @@ the macros are powerful enough for this, and the assembler supports
 these architectures.
 
 * If it's so good, why hasn't it been implemented yet?
-- Features of the construction of the translator create a difference
+
+Features of the construction of the translator create a difference
 between expectation and reality when writing macros that interact with
 each other. If there are conditional blocks of translation in the macro,
 then the parser can see the macro nesting change construction in the
