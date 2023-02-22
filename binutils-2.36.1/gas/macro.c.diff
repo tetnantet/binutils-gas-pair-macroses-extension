@@ -1,0 +1,186 @@
+--- macro.c.0rig	2021-04-17 14:59:32.627962290 +0300
++++ macro.c	2021-04-19 23:35:51.131929744 +0300
+@@ -68,7 +68,7 @@
+ 
+ /* Number of macro expansions that have been done.  */
+ 
+-static int macro_number;
++static int macro_number = 0;
+ 
+ /* Initialize macro processing.  */
+ 
+@@ -625,6 +625,52 @@
+   return idx;
+ }
+ 
++#define BINDARRAY_RESIZE_STEP           4
++
++static void
++bind_array_resize (bindArrayT *bindarr, size_t index)
++{
++    size_t len = bindarr->len;
++    bindarr->array = (bindItemT*) reallocarray (
++          bindarr->array
++        , sizeof (bindItemT)
++        , index + BINDARRAY_RESIZE_STEP);
++    /* Set new items to 0.  */
++    while (len < index + BINDARRAY_RESIZE_STEP)
++      bindarr->array[len++] = 0;
++    bindarr->len = len;
++}
++
++static void
++bind_array_free(bindArrayT *bindarr)
++{
++    if (bindarr->array != NULL)
++      {
++        free (bindarr->array);
++        bindarr->len = 0;
++      }
++}
++
++/* If array is small it is reallocated and new value is set to 0.  */
++
++static void
++bind_array_set (bindArrayT *bindarr, size_t index, bindItemT value)
++{
++    if (index >= bindarr->len)
++      bind_array_resize (bindarr, index);
++    bindarr->array[index] = value;
++}
++
++static bindItemT
++bind_array_get (bindArrayT *bindarr, size_t index)
++{
++    if (index >= bindarr->len)
++      bind_array_set (bindarr, index, 0);
++    return bindarr->array[index];
++}
++
++#undef BINDARRAY_RESIZE_STEP
++
+ /* Free the memory allocated to a macro.  */
+ 
+ static void
+@@ -642,6 +688,7 @@
+     }
+   htab_delete (macro->formal_hash);
+   sb_kill (&macro->sub);
++  bind_array_free (&macro->bind_counter_per_nest);
+   free (macro);
+ }
+ 
+@@ -664,6 +711,9 @@
+   sb_new (&name);
+   macro->file = file;
+   macro->line = line;
++  macro->bind_nest = 0;
++  macro->bind_counter_per_nest.array = NULL;
++  macro->bind_counter_per_nest.len = 0;
+ 
+   macro->formal_count = 0;
+   macro->formals = 0;
+@@ -830,23 +880,91 @@
+ 	      src = sub_actual (src + 1, in, &t, formal_hash, '&', out, 0);
+ 	    }
+ 	}
++
++
+       else if (in->ptr[src] == '\\')
+ 	{
+ 	  src++;
+ 	  if (src < in->len && in->ptr[src] == '(')
+ 	    {
+-	      /* Sub in till the next ')' literally.  */
+-	      src++;
+-	      while (src < in->len && in->ptr[src] != ')')
+-		{
+-		  sb_add_char (out, in->ptr[src++]);
+-		}
+-	      if (src < in->len)
+-		src++;
+-	      else if (!macro)
+-		err = _("missing `)'");
+-	      else
+-		as_bad_where (macro->file, macro->line + macro_line, _("missing `)'"));
++              src++;
++              /* Possible start of macro_name with prefix or suffix operation.  */
++              char *macro_name = &in->ptr[src];
++              char *cpar = (char *) memchr (macro_name, ')', in->len - src);
++              if (cpar)
++                {
++                  size_t macro_name_len = cpar - macro_name;
++                  if (macro_name_len)
++                    {
++                      /* May be "\(macro)", "\(++macro)", "\(--macro)", "\(macro++)", "\(macro--)". */
++                      short int op_pref = 0; /* 0 - no op, -1 - prefix dec, 1 - prefix inc. */
++                      short int op_suff = 0; /* 0 - no op, -1 = suffix dec, 1 - suffix inc. */
++                      if (macro_name_len > 2)
++                        {
++                          if (memcmp (macro_name, "++", sizeof ("++") - 1) == 0)
++                            op_pref = 1;
++                          else if (memcmp (macro_name, "--", sizeof("--") - 1) == 0)
++                            op_pref = -1;
++                          else if (memcmp (&macro_name[macro_name_len-2], "++", sizeof ("++") - 1) == 0)
++                            op_suff = 1;
++                          else if (memcmp (&macro_name[macro_name_len-2], "--", sizeof ("--") - 1) == 0)
++                            op_suff = -1;
++                        }
++
++                      /* Searching previously defined macro. */
++                      char *copy;
++                      size_t i, len;
++                      macro_entry *bind_macro;
++
++                      len = macro_name_len;
++                      if (op_pref || op_suff)
++                        len -= 2;
++
++                      copy = XNEWVEC (char, len + 1);
++                      memcpy (copy, macro_name + (op_pref ? 2 : 0), len);
++                      for (i = 0; i < len; ++i)
++                        copy[i] = TOLOWER (copy[i]);
++                      copy[i] = '\0';
++
++                      if ((bind_macro = macro_entry_find (macro_hash, copy)) != NULL)
++                        {
++                          /* Macro is found: execute optional prefix/suffix operation and insert bind_number.  */
++                          bindItemT bind_counter;
++                          bind_macro->bind_nest += op_pref;
++                          bind_counter = bind_array_get (&bind_macro->bind_counter_per_nest, bind_macro->bind_nest);
++                          if (op_pref < 0)
++                            bind_array_set (&bind_macro->bind_counter_per_nest, bind_macro->bind_nest, ++bind_counter);
++
++                          /* Macro is found: insert using number instead of his macro name.  */
++                          char buffer[sizeof("_65535x65535")];
++                          sprintf (buffer, "_%ux%u", (int) bind_macro->bind_nest, (int) bind_counter);
++                          sb_add_string (out, buffer);
++
++                          if (op_suff < 0)
++                            bind_array_set (&bind_macro->bind_counter_per_nest, bind_macro->bind_nest, ++bind_counter);
++                          bind_macro->bind_nest += op_suff;
++                        }
++                      else
++                        {
++                          /* Macro is absent: copy text as is.  */
++                          *cpar = '\0';
++                          sb_add_string (out, macro_name);
++                          *cpar = ')';
++                        }
++                      free (copy);
++                    }
++                  src += macro_name_len + 1;
++                }
++              else
++                {
++                  /* None ')' was found.  */
++                  while (src < in->len)
++                      sb_add_char (out, in->ptr[src++]);
++                  if (!macro)
++                    err = _("missing `)'");
++                  else
++                    as_bad_where (macro->file, macro->line + macro_line, _("missing `)'"));
++                }
+ 	    }
+ 	  else if (src < in->len && in->ptr[src] == '@')
+ 	    {

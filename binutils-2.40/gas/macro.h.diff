@@ -1,0 +1,27 @@
+--- macro.h.0rig	2023-02-15 18:45:17.870907852 +0200
++++ macro.h	2023-02-15 21:18:46.457002685 +0200
+@@ -56,6 +56,15 @@
+ #define NARG_INDEX (-2)
+ #define LOCAL_INDEX (-3)
+ 
++/* Support unique identifiers to bind macroses each other.  */
++
++typedef unsigned short int bind_item_t;
++
++typedef struct bind_array_struct {
++  bind_item_t *array;			/* Allocated memory address (malloc).  */
++  size_t len;				/* Array item amount.  */
++} bind_array_t;
++
+ /* Describe the macro.  */
+ 
+ typedef struct macro_struct
+@@ -67,6 +76,8 @@
+   const char *name;			/* Macro name.  */
+   const char *file;			/* File the macro was defined in.  */
+   unsigned int line;			/* Line number of definition.  */
++  bind_item_t bind_nest;		/* Interconnected macroses nest number.  */
++  bind_array_t bind_counter_per_nest;	/* Counter for each nest number.  */
+ } macro_entry;
+ 
+ /* Whether any macros have been defined.  */

@@ -1,0 +1,30 @@
+--- macro.h.0rig	2021-04-13 19:01:20.747974208 +0300
++++ macro.h	2021-04-17 00:52:58.816921985 +0300
+@@ -56,6 +56,15 @@
+ #define NARG_INDEX (-2)
+ #define LOCAL_INDEX (-3)
+ 
++/* Support unique identifiers to bind macroses each other.  */
++
++typedef unsigned short int bindItemT;
++
++typedef struct bindArrayS {
++    bindItemT *array;   /* Allocated memory address (malloc).  */
++    size_t    len;      /* Array item amount.  */
++} bindArrayT;
++
+ /* Describe the macro.  */
+ 
+ typedef struct macro_struct
+@@ -65,8 +74,10 @@
+   formal_entry *formals;		/* Pointer to list of formal_structs.  */
+   struct hash_control *formal_hash;	/* Hash table of formals.  */
+   const char *name;			/* Macro name.  */
+-  const char *file;				/* File the macro was defined in.  */
++  const char *file;			/* File the macro was defined in.  */
+   unsigned int line;			/* Line number of definition.  */
++  bindItemT bind_nest;                  /* Interconnected macroses nest number.  */
++  bindArrayT bind_counter_per_nest ;    /* Counter for each nest number. */
+ } macro_entry;
+ 
+ /* Whether any macros have been defined.  */
