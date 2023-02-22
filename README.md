@@ -179,18 +179,26 @@ The corresponded listing can be the following:
 
 Select directory for the downloaded binutils version,
 copy patch files
+
     macro.h.diff
     macro.c.diff
+
 to the local binutils directory near correspoded files
+
     macro.h
     macro.c
+
 and apply patches:
+
     $ patch macro.h < macro.h.diff
     $ patch macro.c < macro.c.diff
+
 Now it is possible to (re-)build binutils as usual:
+
     $ cd <bunutils_dir>
     $ ./configure --prefix ../binutils-usr
     $ make && make install
+
 When all is correct it is possible to translate your .s programs
 by using as from ../binutils-usr/bin/as utility.
 
@@ -216,7 +224,7 @@ Features of the construction of the translator create a difference
 between expectation and reality when writing macros that interact with
 each other. If there are conditional blocks of translation in the macro,
 then the parser can see the macro nesting change construction in the
-name of the label, for example "LABEL\(IF--)_END", and calculate it
+name of the label, for example "LABEL\\(IF--)_END", and calculate it
 prematurely, affecting the previous labels use. As a workaround in this
 cases, labels or instructions with such labels should be placed in
 separate macros. This is a serious and important drawback. Fortunately,
